@@ -1,38 +1,57 @@
-#/bin/sh
-
-#
-# CONFIG
-#
-
-HOST=DOMAINE_NAME
-LOGIN=LOGIN
-PASSWORD=PASSWORD
+#!/bin/sh
 
 PATH_LOG=/var/log/dynhost
 CURRENT_DATE=`date`
 
-#
-# GET IPs
-#
+CRED_FILE=`readlink -f "$0"`
+CRED_FILE=`dirname "$CRED_FILE"`"/dynhost.cred"
 
-HOST_IP=`dig +short $HOST`
-CURRENT_IP=`curl -4 ifconfig.co`
+count=`xmllint --xpath 'count(//credentials/item)' "$CRED_FILE"`
 
-#
-# DO THE WORK
-#
-if [ -z $CURRENT_IP ] || [ -z $HOST_IP ]
+if [ -z $count ]
 then
-        echo "No IP retrieved" >> $PATH_LOG
-else
-        if [ "$HOST_IP" != "$CURRENT_IP" ]
-        then
-                echo "$CURRENT_DATE"": Current IP:" "$CURRENT_IP" "and" "host IP:" "$HOST_IP" "   IP has changed!" >> $PATH_LOG
-                RES=`curl --user "$LOGIN:$PASSWORD" "https://www.ovh.com/nic/update?system=dyndns&hostname=$HOST&myip=$CURRENT_IP"`
-                echo "Result request dynHost:" >> $PATH_LOG
-                echo "$RES" >> $PATH_LOG
-        else
-                echo "$CURRENT_DATE"": Current IP:" "$CURRENT_IP" "and" "Host IP:" "$HOST_IP" "   IP has not changed" >> $PATH_LOG
-        fi
+   echo "$CRED_FILE"" is invalid or doesn't exist !" >> $PATH_LOG
+   echo "" >> $PATH_LOG
+   exit 0
 fi
 
+CURRENT_IP=`curl -4 ifconfig.co`
+if [ -z $CURRENT_IP ]
+then
+   echo "$CURRENT_DATE"":" >> $PATH_LOG
+   echo "   CURRENT IP not retrieved" >> $PATH_LOG
+   echo "" >> $PATH_LOG
+   exit 0
+fi
+
+one_new=0
+for i in `seq 1 $count`;
+do
+   HOST=`xmllint --xpath "//credentials/item[position() = $i]/host/text()" "$CRED_FILE"`
+   HOST_IP=`dig +short $HOST`
+   if [ -z $HOST_IP ]
+   then
+      echo "$CURRENT_DATE"":" >> $PATH_LOG
+      echo "   HOST IP not retrieved for ""$HOST" >> $PATH_LOG
+   else
+      if [ "$HOST_IP" != "$CURRENT_IP" ]
+      then
+         one_new=1
+         USER=`xmllint --xpath "//credentials/item[position() = $i]/user/text()" "$CRED_FILE"`
+         PASS=`xmllint --xpath "//credentials/item[position() = $i]/pass/text()" "$CRED_FILE"`
+         RES=`curl --user "$USER:$PASS" "https://www.ovh.com/nic/update?system=dyndns&hostname=$HOST&myip=$CURRENT_IP"`
+         echo "$CURRENT_DATE"":" >> $PATH_LOG
+         echo "         Host : ""$HOST" >> $PATH_LOG
+         echo "   Current IP : ""$CURRENT_IP" >> $PATH_LOG
+         echo "      Host IP : ""$HOST_IP" >> $PATH_LOG
+         echo "       Result : ""$RES" >> $PATH_LOG
+      fi
+   fi
+done
+
+if [ $one_new = 1 ]
+then
+   echo "" >> $PATH_LOG
+fi
+
+exit 0

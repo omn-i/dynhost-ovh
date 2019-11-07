@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<credentials>
+   <item>
+      <host>mydomain.net</host>
+      <user>my_username</user>
+      <pass>my_password</pass>
+   </item>
+   <item>
+      <host>myanotherdomain.net</host>
+      <user>my_username</user>
+      <pass>my_password</pass>
+   </item>
+</credentials>
